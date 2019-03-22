@@ -99,7 +99,7 @@ void loop()
 
       //Get source MAC Address
      
-      LCD_data[1] = print_mac(Ethernet::buffer, 0, 6);
+      LCD_data[1] = print_mac(Ethernet::buffer, sizeof(cdp_mac), 6);
 
 
 
@@ -171,7 +171,7 @@ void loop()
       Protocal = "LLDP";
       Serial.println("LLPD Packet Received");
       
-      LCD_data[1] = print_mac(Ethernet::buffer, 0, 6);
+      LCD_data[1] = print_mac(Ethernet::buffer, sizeof(lldp_mac), 6);
 
       int DataIndex = 14;
 
@@ -481,7 +481,7 @@ void handleLLDPIPField(const byte a[], unsigned int offset, unsigned int lengtha
       }
       break;
 
-    case 0x0006: //IPv6
+    case 0x0006: //MAC address?
       LCD_data[5] = print_mac (a, offset + 1,  6);
       break;
   }
