@@ -97,7 +97,7 @@ void loop()
       //CDP Packet found and is now getting processed
 
       Protocal = "CDP";
-      Serial.println("CDP Packet Recieved");
+      Serial.println("CDP Packet Received");
 
       //Get source MAC Address
       byte* macFrom = Ethernet::buffer + sizeof(cdp_mac);
@@ -107,60 +107,62 @@ void loop()
 
 
       //Set start hex address
-      int cdpDataIndex = 26;
+      int DataIndex = 26;
 
       //Cycle through the frame reading the TLV fields
-      while (cdpDataIndex < plen) {
-        unsigned int cdpFieldType = (Ethernet::buffer[cdpDataIndex] << 8) | Ethernet::buffer[cdpDataIndex + 1];
-        cdpDataIndex += 2;
-        unsigned int cdpFieldLength = (Ethernet::buffer[cdpDataIndex] << 8) | Ethernet::buffer[cdpDataIndex + 1];
-        cdpDataIndex += 2;
-        cdpFieldLength -= 4;
+      while (DataIndex < plen) {
+        unsigned int cdpFieldType = (Ethernet::buffer[DataIndex] << 8) | Ethernet::buffer[DataIndex + 1];
+        DataIndex += 2;
+        unsigned int TLVFieldLength = (Ethernet::buffer[DataIndex] << 8) | Ethernet::buffer[DataIndex + 1];
+        DataIndex += 2;
+        TLVFieldLength -= 4;
 
         switch (cdpFieldType) {
 
-          case 0x0001: //Get the device name
+          case 0x0001: //CDP Device name
             Device = 1;
-            handleCdpAsciiField(Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+            handleCdpAsciiField(Ethernet::buffer, DataIndex, TLVFieldLength);
             Device = 0;
             break;
 
-          case 0x0002: //IP address
-            handleCdpAddresses(Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+          case 0x0002: //CDP IP address
+            handleCdpAddresses(Ethernet::buffer, DataIndex, TLVFieldLength);
             break;
 
-          case 0x0003: //Port Name
+          case 0x0003: //CDP Port Name
             Port = 1;
-            handleCdpAsciiField( Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+            handleCdpAsciiField( Ethernet::buffer, DataIndex, TLVFieldLength);
             Port = 0;
             break;
 
-          case 0x0004: //Capabilities
-            //handleCdpCapabilities(Ethernet::buffer, cdpDataIndex + 2, cdpFieldLength - 2);
-            break;
+          /* case 0x0004: //Capabilities
+            handleCdpCapabilities(Ethernet::buffer, DataIndex + 2, TLVFieldLength - 2);
+            break; */
 
-          /* case 0x000b:
-             SWver = 1;
-               if (cdpFieldLength > 50) {    cdpFieldLength = 50;}
-             handleCdpAsciiField( Ethernet::buffer, cdpDataIndex, cdpFieldLength);
-             SWver = 0;
-             break; */
 
           case 0x0006: //CDP Model Name
             Model = 1;
-            handleCdpAsciiField( Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+            handleCdpAsciiField( Ethernet::buffer, DataIndex, TLVFieldLength);
             Model = 0;
             break;
 
           case 0x000a: //CDP VLAN #
-            handleCdpNumField( Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+            handleCdpNumField( Ethernet::buffer, DataIndex, TLVFieldLength);
             break;
 
+          /* case 0x000b:
+            SWver = 1;
+            if (TLVFieldLength > 50) {    TLVFieldLength = 50;}
+            handleCdpAsciiField( Ethernet::buffer, DataIndex, TLVFieldLength);
+            SWver = 0;
+            break; */
+
+
           case 0x000e: //CDP VLAN voice#
-            handleCdpVoiceVLAN( Ethernet::buffer, cdpDataIndex + 2, cdpFieldLength - 2);
+            handleCdpVoiceVLAN( Ethernet::buffer, DataIndex + 2, TLVFieldLength - 2);
             break;
         }
-        cdpDataIndex += cdpFieldLength;
+        DataIndex += TLVFieldLength;
       }
       drawscreen();
     }
@@ -169,29 +171,29 @@ void loop()
 
       //CDP Packet found and is now getting processed
       Protocal = "LLDP";
-      Serial.println("LLPD Packet Recieved");
+      Serial.println("LLPD Packet Received");
 
-      byte* macFrom = Ethernet::buffer + sizeof(lldp_mac);
-      print_mac(macFrom, 0, 6);
+      byte* macFrom1 = Ethernet::buffer + sizeof(lldp_mac);
+      print_mac(macFrom1, 0, 6);
 
-      int cdpDataIndex = 14;
+      int DataIndex = 14;
 
-      while (cdpDataIndex < plen) { // read all remaining TLV fields
-        unsigned int cdpFieldType = (Ethernet::buffer[cdpDataIndex]);
-        cdpDataIndex += 1;
-        unsigned int cdpFieldLength = (Ethernet::buffer[cdpDataIndex]);
-        /* Serial.print(" type:");
-          Serial.print(cdpFieldType, HEX);
-          Serial.print(" Length:");
-          Serial.print(cdpFieldLength);*/
-        cdpDataIndex += 1;
+      while (DataIndex < plen) { // read all remaining TLV fields
+        unsigned int cdpFieldType = (Ethernet::buffer[DataIndex]);
+        DataIndex += 1;
+        unsigned int TLVFieldLength = (Ethernet::buffer[DataIndex]);
+        /*Serial.print(" type:");
+        Serial.print(cdpFieldType, HEX);
+        Serial.print(" Length:");
+        Serial.print(TLVFieldLength);*/
+        DataIndex += 1;
 
         switch (cdpFieldType) {
 
 
           case 0x0004: //Port Name
             Port = 1;
-            handleCdpAsciiField( Ethernet::buffer, cdpDataIndex + 1, cdpFieldLength - 1);
+            handleCdpAsciiField( Ethernet::buffer, DataIndex + 1, TLVFieldLength - 1);
             Port = 0;
             break;
 
@@ -205,25 +207,23 @@ void loop()
 
           case 0x000a: //Device Name
             Device = 1;
-            handleCdpAsciiField( Ethernet::buffer, cdpDataIndex , (cdpFieldLength));
+            handleCdpAsciiField( Ethernet::buffer, DataIndex , (TLVFieldLength));
             Device = 0;
             break;
 
           case 0x000e://Capabilities
-            // handleCdpCapabilities( Ethernet::buffer, cdpDataIndex + 2, cdpFieldLength - 2);
+            // handleCdpCapabilities( Ethernet::buffer, DataIndex + 2, TLVFieldLength - 2);
             break;
 
-          case 0x0010:
-            //Management IP Address
-            handleLLDPIPField(Ethernet::buffer, cdpDataIndex + 2, 4);
+          case 0x0010: //Management IP Address
+            handleLLDPIPField(Ethernet::buffer, DataIndex + 2, 4);
             break;
 
-          case 0x00fe:
-            //LLDP Organisational TLV #
-            handleLLDPOrgTLV(Ethernet::buffer, cdpDataIndex, cdpFieldLength);
+          case 0x00fe: //LLDP Organisational TLV #
+            handleLLDPOrgTLV(Ethernet::buffer, DataIndex, TLVFieldLength);
             break;
         }
-        cdpDataIndex += cdpFieldLength;
+        DataIndex += TLVFieldLength;
       }
       drawscreen();
     }
@@ -233,15 +233,23 @@ void loop()
 void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha) {
   unsigned int Orgtemp;
 
-  for (unsigned int i = offset; i < ( offset + 3 ); ++i ) {
-    Orgtemp += a[i];
-  }
-
+  // for (unsigned int i = offset; i < ( offset + 3 ); ++i ) {
+  //   Orgtemp += a[i];
+  // }
+  Orgtemp = (a[offset] << 16) | (a[offset + 1] << 8) | a[offset + 2];
   //  Serial.println( Orgtemp, HEX);
+  /*Serial.print("\n Org Type:");
+  Serial.print(Orgtemp, HEX);
+  Serial.print(" Length:");
+  Serial.print(lengtha);*/
   switch (Orgtemp) {
 
-    case 205:
+    case 0x0012BB:
       //TIA TR-41
+    /*  Serial.print("\n Subtype:");
+      Serial.print(a[offset + 3], HEX);
+      Serial.print(" Length:");
+      Serial.print(lengtha);*/
       switch (a[offset + 3]) {
 
         /*case 0x0001:
@@ -250,16 +258,15 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
 
         case 0x0002:
           //TIA TR-41 -network policy - deals with Application types and additional settings - good for voice vlan, etc..
-
+/*          Serial.print("\n Subtype:");
+          Serial.print(a[offset + 3], HEX);
+          Serial.print(" Length:");
+          Serial.print(lengtha); */
           switch (a[offset + 4]) {
             case 0x0001: //TIA TR-41 - network policy - Voice
               unsigned int VoiceVlanID;
-              VoiceVlanID = (a[offset + 5] << 8) | a[offset + 1];
-              //Serial.println( print_binary(VoiceVlanID,24));
-              VoiceVlanID = VoiceVlanID << 3; //shift the bits to the left to remove the first bits
-              //  Serial.println( print_binary(VoiceVlanID,24));
-              VoiceVlanID = VoiceVlanID >> 7; //shift the bits to the right remove the last bits
-              //  Serial.println( print_binary(VoiceVlanID,24));
+              VoiceVlanID = (a[offset+ 5] << 16) | (a[offset + 6] << 8) | a[offset + 7];
+              VoiceVlanID = VoiceVlanID >>9; //shift the bits to the left to remove the first bits
               LCD_data[6] = String(VoiceVlanID, DEC);
               break;
 
@@ -310,9 +317,12 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
             break; */
 
       }
-    case 33:
+    case 0x00120F:
       //IEEE 802.3
-
+     /* Serial.print("\n Subtype:");
+      Serial.print(a[offset + 3], HEX);
+      Serial.print(" Length:");
+      Serial.print(lengtha);*/
       switch (a[offset + 3]) {
           //case 0x0001:
           //IEEE 802.3 - IEEE MAC/PHY Configuration/Status\n");
@@ -320,7 +330,7 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
           //break;
       }
       break;
-    case 322:
+    case 0x0080C2:
       //IEEE
 
       switch (a[offset + 3]) {
@@ -621,8 +631,7 @@ void drawscreen () {
   delay(500);
 }
 
-void printVolts()
-{
+void printVolts(){
   float sensorValue = analogRead(A3); //read the A0 pin value
   float voltage = sensorValue / 1024 * 5.0;
   //convert the value to a true voltage.
@@ -638,4 +647,3 @@ void printVolts()
     //Serial.print("LOW");
   }
 }
-
