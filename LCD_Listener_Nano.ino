@@ -38,8 +38,6 @@ String Names[8] = {
 // Option 1: use any pins but a little slower
 Adafruit_ST7735 tft = Adafruit_ST7735(cs, dc, rst);
 
-//Print &out = tft;
-
 void setup()
 {
   //  tft.fillScreen(ST7735_BLACK);
@@ -100,8 +98,8 @@ void loop()
       Serial.println("CDP Packet Received");
 
       //Get source MAC Address
-      byte* macFrom = Ethernet::buffer + sizeof(cdp_mac);
-      print_mac(macFrom, 0, 6);
+     
+      LCD_data[1] = print_mac(Ethernet::buffer, 0, 6);
 
 
 
@@ -172,9 +170,8 @@ void loop()
       //CDP Packet found and is now getting processed
       Protocal = "LLDP";
       Serial.println("LLPD Packet Received");
-
-      byte* macFrom1 = Ethernet::buffer + sizeof(lldp_mac);
-      print_mac(macFrom1, 0, 6);
+      
+      LCD_data[1] = print_mac(Ethernet::buffer, 0, 6);
 
       int DataIndex = 14;
 
@@ -183,9 +180,9 @@ void loop()
         DataIndex += 1;
         unsigned int TLVFieldLength = (Ethernet::buffer[DataIndex]);
         /*Serial.print(" type:");
-        Serial.print(cdpFieldType, HEX);
-        Serial.print(" Length:");
-        Serial.print(TLVFieldLength);*/
+          Serial.print(cdpFieldType, HEX);
+          Serial.print(" Length:");
+          Serial.print(TLVFieldLength);*/
         DataIndex += 1;
 
         switch (cdpFieldType) {
@@ -216,7 +213,7 @@ void loop()
             break;
 
           case 0x0010: //Management IP Address
-            handleLLDPIPField(Ethernet::buffer, DataIndex + 2, 4);
+            handleLLDPIPField(Ethernet::buffer, DataIndex + 1, TLVFieldLength);
             break;
 
           case 0x00fe: //LLDP Organisational TLV #
@@ -239,17 +236,17 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
   Orgtemp = (a[offset] << 16) | (a[offset + 1] << 8) | a[offset + 2];
   //  Serial.println( Orgtemp, HEX);
   /*Serial.print("\n Org Type:");
-  Serial.print(Orgtemp, HEX);
-  Serial.print(" Length:");
-  Serial.print(lengtha);*/
+    Serial.print(Orgtemp, HEX);
+    Serial.print(" Length:");
+    Serial.print(lengtha);*/
   switch (Orgtemp) {
 
     case 0x0012BB:
       //TIA TR-41
-    /*  Serial.print("\n Subtype:");
-      Serial.print(a[offset + 3], HEX);
-      Serial.print(" Length:");
-      Serial.print(lengtha);*/
+      /*  Serial.print("\n Subtype:");
+        Serial.print(a[offset + 3], HEX);
+        Serial.print(" Length:");
+        Serial.print(lengtha);*/
       switch (a[offset + 3]) {
 
         /*case 0x0001:
@@ -258,15 +255,15 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
 
         case 0x0002:
           //TIA TR-41 -network policy - deals with Application types and additional settings - good for voice vlan, etc..
-/*          Serial.print("\n Subtype:");
-          Serial.print(a[offset + 3], HEX);
-          Serial.print(" Length:");
-          Serial.print(lengtha); */
+          /*          Serial.print("\n Subtype:");
+                    Serial.print(a[offset + 3], HEX);
+                    Serial.print(" Length:");
+                    Serial.print(lengtha); */
           switch (a[offset + 4]) {
             case 0x0001: //TIA TR-41 - network policy - Voice
               unsigned int VoiceVlanID;
-              VoiceVlanID = (a[offset+ 5] << 16) | (a[offset + 6] << 8) | a[offset + 7];
-              VoiceVlanID = VoiceVlanID >>9; //shift the bits to the left to remove the first bits
+              VoiceVlanID = (a[offset + 5] << 16) | (a[offset + 6] << 8) | a[offset + 7];
+              VoiceVlanID = VoiceVlanID >> 9; //shift the bits to the left to remove the first bits
               LCD_data[6] = String(VoiceVlanID, DEC);
               break;
 
@@ -319,10 +316,10 @@ void handleLLDPOrgTLV( const byte a[], unsigned int offset, unsigned int lengtha
       }
     case 0x00120F:
       //IEEE 802.3
-     /* Serial.print("\n Subtype:");
-      Serial.print(a[offset + 3], HEX);
-      Serial.print(" Length:");
-      Serial.print(lengtha);*/
+      /* Serial.print("\n Subtype:");
+        Serial.print(a[offset + 3], HEX);
+        Serial.print(" Length:");
+        Serial.print(lengtha);*/
       switch (a[offset + 3]) {
           //case 0x0001:
           //IEEE 802.3 - IEEE MAC/PHY Configuration/Status\n");
@@ -471,13 +468,24 @@ void handleCdpVoiceVLAN( const byte a[], unsigned int offset, unsigned int lengt
 
 void handleLLDPIPField(const byte a[], unsigned int offset, unsigned int lengtha) {
   int j = 0;
-  for (unsigned int i = offset; i < ( offset + lengtha ); ++i , ++j) {
-    //LCD_data[5] = "";
-    LCD_data[5] += a[i], DEC;
-    if (j < 3) {
-      LCD_data[5] += ".";
-    }
+  LCD_data[5] = "";
+  unsigned int AddressType = a[offset];
+  switch (AddressType) {
+    case 0x0001: //IPv4
+      for (unsigned int i = offset + 1; i < ( offset + 1 + 4 ); ++i , ++j) {
+        //LCD_data[5] = "";
+        LCD_data[5] += a[i], DEC;
+        if (j < 3) {
+          LCD_data[5] += ".";
+        }
+      }
+      break;
+
+    case 0x0006: //IPv6
+      LCD_data[5] = print_mac (a, offset + 1,  6);
+      break;
   }
+
 
   // int lengthostring = sizeof(LCD_data[5]);
   // LCD_data[5][lengtha] = '\0';
@@ -553,20 +561,18 @@ String print_ip(const byte a[], unsigned int offset, unsigned int length) {
 String print_mac(const byte a[], unsigned int offset, unsigned int length) {
   String Mac;
   char temp [40];
-  LCD_data[1] = "";
+
   for (unsigned int i = offset; i < offset + length; ++i) {
 
     if (i > offset) {
-      //  LCD_data[1] = LCD_data[1] + Mac + ':';
       Mac = Mac + ':';
     }
     if (a[i] < 0x10) {
       Mac = Mac + '0';
-      //    LCD_data[1] = LCD_data[1] + Mac + '0';
     }
     Mac = Mac + String (a[i], HEX);
   }
-  LCD_data[1] = LCD_data[1]  + Mac;
+
   return Mac;
 }
 
@@ -631,7 +637,7 @@ void drawscreen () {
   delay(500);
 }
 
-void printVolts(){
+void printVolts() {
   float sensorValue = analogRead(A3); //read the A0 pin value
   float voltage = sensorValue / 1024 * 5.0;
   //convert the value to a true voltage.
