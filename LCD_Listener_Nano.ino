@@ -42,7 +42,7 @@ void setup()
 {
   //  tft.fillScreen(ST7735_BLACK);
   pinMode(13, OUTPUT);
-  Serial.begin(19200);
+  Serial.begin(9600);
   Serial.println("Serial Initialised\nScreen Initialising");
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   Serial.println("Screen Done");
@@ -98,7 +98,7 @@ void loop()
       Serial.println("CDP Packet Received");
 
       //Get source MAC Address
-     
+
       LCD_data[1] = print_mac(Ethernet::buffer, sizeof(cdp_mac), 6);
 
 
@@ -170,7 +170,7 @@ void loop()
       //CDP Packet found and is now getting processed
       Protocal = "LLDP";
       Serial.println("LLPD Packet Received");
-      
+
       LCD_data[1] = print_mac(Ethernet::buffer, sizeof(lldp_mac), 6);
 
       int DataIndex = 14;
@@ -597,7 +597,7 @@ void drawscreen () {
   tft.setRotation(1);
   tft.setCursor(0, 0);
 
-  testdrawtext("MODLOG CDP/LLDP", ST7735_RED);
+  testdrawtext("MODLOG CDP/LLDP ", ST7735_RED);
   printVolts();
   tft.setTextColor(ST7735_RED, ST7735_BLUE);
   if (String(ether.myip[1]) == "") {
@@ -638,18 +638,60 @@ void drawscreen () {
 }
 
 void printVolts() {
-  float sensorValue = analogRead(A3); //read the A0 pin value
-  float voltage = sensorValue / 1024 * 5.0;
-  //convert the value to a true voltage.
-  int percent = 100 - ((5 - voltage ) / 2.4 * 100);
-  tft.setCursor(110, 0);
-  //Serial.println(voltage );
-  //Serial.println(percent);
-  testdrawtext("BATT:" + String(percent) + "%\n", ST7735_BLUE);
-  //Serial.print(voltage); //print the voltage to LCD
-  //Serial.print(" V");
-  if (voltage < 6.50) //set the voltage considered low battery here
+
+  int MinCharge = 3000;
+  int MaxCharge = 3700;
+  int DiffCharge = MaxCharge - MinCharge;
+
+  // Thank you to who every wrote the following code!! I have looked but can't find the original author.
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+#if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+#elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
+  ADMUX = _BV(MUX5) | _BV(MUX0);
+#elif defined (__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__)
+  ADMUX = _BV(MUX3) | _BV(MUX2);
+#else
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+#endif
+
+  delay(100); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA, ADSC)); // measuring
+
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
+  uint8_t high = ADCH; // unlocks both
+
+  long result = (high << 8) | low;
+  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+  float Voltage = result / 1000;
+
+  /*Serial.println("Voltage: ");
+    Serial.println(Voltage);
+
+    Serial.println("Result: ");
+    Serial.println(result);*/
+
+  float percent1 = result - MinCharge;
+  int Percent = percent1 / DiffCharge * 100;
+
+  /*Serial.println("Percent: ");
+    Serial.println(Percent);*/
+
+  //tft.setCursor(100, 0);
+  if (Percent > 100) {
+    if (Voltage > 4.7) {
+      testdrawtext("BATT:EXT\n", ST7735_ORANGE);
+    }
+    else
+    {
+      testdrawtext("BATT:100%\n", ST7735_YELLOW);
+    }
+
+  }
+  else
   {
-    //Serial.print("LOW");
+    testdrawtext("BATT:" + String(Percent) + "%\n", ST7735_YELLOW);
   }
 }
